@@ -1099,3 +1099,45 @@ type ACLOptions struct {
 	Propagate IntOrBool `json:",omitempty"`
 	Delete    IntOrBool `json:",omitempty"` // true to delete the ACL
 }
+
+type SDNVNets []*SDNVNet
+type SDNVNet struct {
+	client *Client
+
+	Digest    string `json:"digest"`
+	Type      string `json:"type"`
+	Vlanaware int    `json:"vlanaware,omitempty"`
+	Vnet      string `json:"vnet"`
+	Zone      string `json:"zone"`
+	Alias     string `json:"alias,omitempty"`
+	Tag       int    `json:"tag,omitempty"`
+}
+
+type SDNZones []*SDNZone
+type SDNZone struct {
+	client       *Client
+	Digest       string `json:"digest"`
+	Zone         string `json:"zone"`
+	Type         string `json:"type"`
+	Bridge       string `json:"bridge"`
+	Tag          int    `json:"tag"`
+	VlanProtocol string `json:"vlan-protocol"`
+	Ipam         string `json:"ipam"`
+}
+
+type NodeSDNZones []*NodeSDNZone
+type NodeSDNZone struct {
+	client *Client
+	node   *Node
+	Status string `json:"status"`
+	Zone   string `json:"zone"`
+}
+
+type NodeSDNZoneVNets []*NodeSDNZoneVNet
+type NodeSDNZoneVNet struct {
+	client    *Client
+	zone      *NodeSDNZone
+	Status    string `json:"status"`
+	StatusMsg string `json:"statusmsg"`
+	VNet      string `json:"vnet"`
+}

@@ -47,6 +47,12 @@ func IsErrNoop(err error) bool {
 	return errors.Is(err, ErrNoop)
 }
 
+var ErrNotImplementend = errors.New("not implemented")
+
+func IsErrNotImplemented(err error) bool {
+	return errors.Is(err, ErrNotImplementend)
+}
+
 func MakeTag(v string) string {
 	return fmt.Sprintf(TagFormat, v)
 }
@@ -243,9 +249,12 @@ func (c *Client) authHeaders(header *http.Header) {
 }
 
 func (c *Client) handleResponse(res *http.Response, v interface{}) error {
-	if res.StatusCode == http.StatusInternalServerError ||
-		res.StatusCode == http.StatusNotImplemented {
+	if res.StatusCode == http.StatusInternalServerError {
 		return errors.New(res.Status)
+	}
+
+	if res.StatusCode == http.StatusNotImplemented {
+		return ErrNotImplementend
 	}
 
 	body, err := io.ReadAll(res.Body)

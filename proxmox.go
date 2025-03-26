@@ -24,6 +24,37 @@ const (
 	TagFormat        = "go-proxmox+%s"
 )
 
+type ProxmoxError struct {
+	message  string
+	HttpCode int
+
+	response *http.Response
+}
+
+func (e ProxmoxError) Error() string {
+	return e.message
+}
+
+func (e ProxmoxError) Is(target error) bool {
+	return errors.As(target, &ProxmoxError{})
+}
+
+func IsInternalServerError(err error) bool {
+	if proxmoxError, ok := err.(*ProxmoxError); ok || errors.As(err, &proxmoxError) {
+		return proxmoxError.HttpCode == 500
+	} else {
+		return false
+	}
+}
+
+func IsNoRouteToHostInternalServerError(err error) bool {
+	if proxmoxError, ok := err.(*ProxmoxError); ok || errors.As(err, &proxmoxError) {
+		return proxmoxError.HttpCode == 595
+	} else {
+		return false
+	}
+}
+
 var ErrNotAuthorized = errors.New("not authorized to access endpoint")
 
 func IsNotAuthorized(err error) bool {
@@ -250,12 +281,20 @@ func (c *Client) authHeaders(header *http.Header) {
 }
 
 func (c *Client) handleResponse(res *http.Response, v interface{}) error {
-	if res.StatusCode == http.StatusInternalServerError {
-		return errors.New(res.Status)
+	if res.StatusCode >= http.StatusAccepted && res.StatusCode < 600 {
+		return &ProxmoxError{
+			message:  res.Status,
+			HttpCode: res.StatusCode,
+			response: res,
+		} // errors.New(res.Status)
 	}
 
 	if res.StatusCode == http.StatusNotImplemented {
 		return ErrNotImplementend
+	}
+	
+	if res.StatusCode == 595 {
+		return ErrNotAuthorized
 	}
 
 	body, err := io.ReadAll(res.Body)
@@ -397,6 +436,12 @@ func (c *Client) VNCWebSocket(path string, vnc *VNC) (chan string, chan string, 
 	}
 
 	go func() {
+		defer func() {
+			if recover() != nil {
+				c.log.Warnf("Recovered from panic")
+			}
+		}()
+		
 		for {
 			select {
 			case <-done:

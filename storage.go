@@ -149,6 +149,48 @@ func (s *Storage) Backup(ctx context.Context, name string) (backup *Backup, err 
 	return
 }
 
+func (s *Storage) Snippet(ctx context.Context, name string) (snippet *Snippet, err error) {
+	err = s.client.Get(ctx, fmt.Sprintf("/nodes/%s/storage/%s/content/%s:%s/%s", s.Node, s.Name, s.Name, "snippets", name), &snippet)
+	if err != nil {
+		return nil, err
+	}
+
+	snippet.client = s.client
+	snippet.Node = s.Node
+	snippet.Storage = s.Name
+	return
+}
+
+func (s *Storage) Image(ctx context.Context, name string) (image *Image, err error) {
+	err = s.client.Get(ctx, fmt.Sprintf("/nodes/%s/storage/%s/content/%s:%s", s.Node, s.Name, s.Name, name), &image)
+	if err != nil {
+		return nil, err
+	}
+
+	image.client = s.client
+	image.Node = s.Node
+	image.Storage = s.Name
+	return
+}
+
+func (s *Storage) Contents(ctx context.Context) (contents *Contents, err error) {
+	err = s.client.Get(ctx, fmt.Sprintf("/nodes/%s/storage/%s/content", s.Node, s.Name), &contents)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, content := range *contents {
+		content.client = s.client
+		content.Node = s.Node
+		content.Storage = s.Name
+	}
+	return
+}
+
+func (s *Storage) Delete(ctx context.Context, volID string) (*Task, error) {
+	return deleteVolume(ctx, s.client, s.Node, s.Name, volID, "", "")
+}
+
 func (v *VzTmpl) Delete(ctx context.Context) (*Task, error) {
 	return deleteVolume(ctx, v.client, v.Node, v.Storage, v.VolID, v.Path, "vztmpl")
 }
@@ -174,4 +216,50 @@ func deleteVolume(ctx context.Context, c *Client, n, s, v, p, t string) (*Task, 
 
 	err := c.Delete(ctx, fmt.Sprintf("/nodes/%s/storage/%s/content/%s", n, s, v), &upid)
 	return NewTask(upid, c), err
+}
+
+func (c *Client) Storages(ctx context.Context) (*CStorages, error) {
+
+	storage := CStorages{}
+	if err := c.Get(ctx, "/storage", &storage); err != nil {
+		return nil, err
+	}
+
+	for _, s := range storage {
+		s.client = s.client
+	}
+
+	return &storage, nil
+}
+
+func (c *Client) Storage(ctx context.Context, name string) (*CStorage, error) {
+
+	storage := CStorage{}
+	if err := c.Get(ctx, fmt.Sprintf("/storage/%s", name), &storage); err != nil {
+		return nil, err
+	}
+	storage.client = c
+
+	return &storage, nil
+}
+
+func (c *Client) NewStorage(ctx context.Context, name string, storageType string, options map[string]string) (*CStorage, error) {
+	data := make(map[string]string)
+	for k, v := range options {
+		data[k] = v
+	}
+	data["storage"] = name
+	data["type"] = storageType
+
+	var storage CStorage
+	if err := c.Post(ctx, "/storage", data, &storage); err != nil {
+		return nil, err
+	}
+	storage.client = c
+
+	return &storage, nil
+}
+
+func (s *CStorage) Delete(ctx context.Context) error {
+	return s.client.Delete(ctx, fmt.Sprintf("/storage/%s", s.Name), nil)
 }

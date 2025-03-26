@@ -353,7 +353,7 @@ type VirtualMachineConfig struct {
 
 	// Qemu memory specs
 	Numa      int    `json:"numa,omitempty"`
-	Memory    int    `json:"memory,omitempty"`
+	Memory    StringOrUint64    `json:"memory,omitempty"`
 	Hugepages string `json:"hugepages,omitempty"`
 	Balloon   int    `json:"balloon,omitempty"`
 
@@ -701,6 +701,20 @@ type Storage struct {
 	Storage      string
 }
 
+type CStorages []*CStorage
+type CStorage struct {
+	client     *Client
+	Content    string
+	Digest     string
+	Mountpoint string
+	Pool       string
+	Disable    int
+	Path       string
+	Shared     int
+	Name       string `json:"storage"`
+	Type       string
+}
+
 type Volume interface {
 	Delete() error
 }
@@ -714,6 +728,13 @@ type VzTmpl struct{ Content }
 type Backups []*Backup
 type Backup struct{ Content }
 
+type Snippets []*Snippet
+type Snippet struct{ Content }
+
+type Images []*Image
+type Image struct{ Content }
+
+type Contents []*Content
 type Content struct {
 	client  *Client
 	URL     string
@@ -727,6 +748,8 @@ type Content struct {
 	Used    StringOrUint64 `json:",omitempty"`
 	Path    string         `json:",omitempty"`
 	Notes   string         `json:",omitempty"`
+	Name    string         `json:",omitempty"`
+	VmID    int            `json:",omitempty"`
 }
 
 type IsTemplate bool

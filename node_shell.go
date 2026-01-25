@@ -233,11 +233,54 @@ func (s *NodeShell) LoginIfRequired() error {
 		return err
 	}
 
-	// successful login
-	if _, _, err := s.ExpectMessageContains("Last login", &defaultTimeout); err != nil {
-		return err
+	// successful login - check for either "Last login" (SSH) or shell prompt (node shell)
+	// Shell prompt patterns vary widely across distros and configurations, so we check for:
+	// 1. Lines ending with $ or # (common prompt endings)
+	// 2. Lines containing user@host: pattern (common bash/zsh format)
+	// 3. Lines ending with ] followed by $ or # (bracket-style prompts)
+
+	// Match lines ending with $ or # with optional whitespace
+	// Captures: "user@host:~$ ", "$ ", "[user@host dir]# ", etc.
+	promptEndPattern := regexp.MustCompile(`[$#]\s*$`)
+
+	// Match user@host: pattern (common in bash/zsh)
+	userHostPattern := regexp.MustCompile(`[a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+:`)
+
+	lines, stop := s.ReadLines()
+	defer stop()
+
+	loginSuccessTimeout := time.After(defaultTimeout)
+	for {
+		select {
+		case line, open := <-lines:
+			if !open {
+				return errors.New("connection closed while waiting for login confirmation")
+			}
+
+			// Check for "Last login" message (typical in SSH)
+			if strings.Contains(line, "Last login") {
+				return nil
+			}
+
+			// Check for shell prompt indicators
+			// A line is likely a prompt if it ends with $ or # AND contains user@host pattern
+			// OR if it's a simple $ or # prompt
+			trimmedLine := strings.TrimSpace(line)
+			hasPromptEnd := promptEndPattern.MatchString(trimmedLine)
+			hasUserHost := userHostPattern.MatchString(trimmedLine)
+
+			if hasPromptEnd && (hasUserHost || trimmedLine == "$" || trimmedLine == "#") {
+				return nil
+			}
+
+			// Check for login failure indicators
+			if strings.Contains(line, "Login incorrect") || strings.Contains(line, "Authentication failure") {
+				return errors.New("login failed: incorrect credentials")
+			}
+		case <-loginSuccessTimeout:
+			return errors.New("timeout while waiting for login confirmation")
+		}
 	}
-	return nil
 }
 
 func (s *NodeShell) WriteMessage(message string) error {

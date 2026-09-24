@@ -400,16 +400,20 @@ func (v *VirtualMachine) Clone(ctx context.Context, params *VirtualMachineCloneO
 	return newid, NewTask(upid, v.client), nil
 }
 
-func (v *VirtualMachine) ResizeDisk(ctx context.Context, disk, size string) (err error) {
-	err = v.client.Put(ctx, fmt.Sprintf("/nodes/%s/qemu/%d/resize", v.Node, v.VMID), map[string]string{
+func (v *VirtualMachine) ResizeDisk(ctx context.Context, disk, size string) (task *Task, err error) {
+	var upid UPID
+	if err = v.client.Put(ctx, fmt.Sprintf("/nodes/%s/qemu/%d/resize", v.Node, v.VMID), map[string]string{
 		"disk": disk,
 		"size": size,
-	}, nil)
-	if err != nil {
-		return
+	}, &upid); err != nil {
+		return nil, err
 	}
 
-	return
+	if upid == "" {
+		return nil, fmt.Errorf("resize disk %s to %s: PVE answered without a task", disk, size)
+	}
+
+	return NewTask(upid, v.client), nil
 }
 
 func (v *VirtualMachine) UnlinkDisk(ctx context.Context, diskID string, force bool) (task *Task, err error) {

@@ -50,6 +50,15 @@ func IsNotFound(err error) bool {
 	return errors.Is(err, ErrNotFound)
 }
 
+// StatusError is returned for a response PVE answered with a 5xx status. Error() is the
+// status line, unchanged, because PVE puts its message in the reason phrase.
+type StatusError struct {
+	StatusCode int
+	Status     string
+}
+
+func (e *StatusError) Error() string { return e.Status }
+
 var ErrNoop = errors.New("nothing to do")
 
 func IsErrNoop(err error) bool {
@@ -444,9 +453,8 @@ func (c *Client) authHeaders(header *http.Header) {
 }
 
 func (c *Client) handleResponse(res *http.Response, v interface{}) error {
-	if res.StatusCode == http.StatusInternalServerError ||
-		res.StatusCode == http.StatusNotImplemented {
-		return errors.New(res.Status)
+	if res.StatusCode >= http.StatusInternalServerError {
+		return &StatusError{StatusCode: res.StatusCode, Status: res.Status}
 	}
 
 	body, err := io.ReadAll(res.Body)
